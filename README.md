@@ -1,3 +1,3 @@
 # Simple SPA Server (3s)
 
-Oficcial Gramework's simple SPA server
+Official Gramework's Simple SPA Server
