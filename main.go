@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io/ioutil"
+	"path"
 	"strings"
 
 	"github.com/gramework/gramework"
@@ -15,6 +17,37 @@ var (
 	cache       = pflag.BoolP("cache", "c", false, "enable cache")
 )
 
+func serveDir(app *gramework.App, sp, sr string, slashCnt int) {
+	h := app.ServeDirNoCacheCustom(sp, slashCnt, true, false, []string{"index.html"})
+	if *cache {
+		h = app.ServeDirCustom(sp, slashCnt, true, false, []string{"index.html"})
+	}
+
+	app.GET(path.Join(sr, "/*any"), h)
+}
+
+func regStaticHandlers(app *gramework.App, sp string, slashCnt int) {
+	files, err := ioutil.ReadDir(sp)
+	if err != nil {
+		app.Logger.WithError(err).WithField("path", sp).Fatal("static directory does not exist")
+	}
+
+	for _, file := range files {
+		p := path.Clean(path.Join(sp, file.Name()))
+		r := "/" + strings.TrimLeft(file.Name(), "/")
+
+		if strings.Contains(file.Name(), ".fasthttp.gz") || path.Clean(*indexPath) == p {
+			continue
+		}
+
+		if file.IsDir() {
+			serveDir(app, p, r, slashCnt)
+		} else {
+			app.ServeFile(r, p)
+		}
+	}
+}
+
 func main() {
 	pflag.Parse()
 
@@ -23,12 +56,18 @@ func main() {
 
 	app.SPAIndex(*indexPath)
 
-	slashCnt := strings.Count(*staticRoute, "/")
-	h := app.ServeDirNoCacheCustom(*staticPath, slashCnt, true, false, nil)
-	if *cache {
-		h = app.ServeDirCustom(*staticPath, slashCnt, true, false, nil)
+	sp := path.Clean(*staticPath)
+	sr := path.Clean(*staticRoute)
+	slashCnt := strings.Count(sr, "/")
+	if len(*staticRoute) == 0 {
+		sr = "/"
 	}
-	app.GET(*staticRoute+"/*any", h)
+
+	if sr == "/" {
+		regStaticHandlers(app, sp, slashCnt)
+	} else {
+		serveDir(app, sp, sr, slashCnt)
+	}
 
 	app.ListenAndServe(*bind)
 }
