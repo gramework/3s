@@ -15,6 +15,13 @@ var (
 	staticRoute = pflag.StringP("staticroute", "r", "/static", "static route")
 	bind        = pflag.StringP("bind", "b", ":80", "port to listen")
 	cache       = pflag.BoolP("cache", "c", false, "enable cache")
+	tls         = pflag.BoolP("tls", "t", false, "enable TLS via letsencrypt")
+	dev         = pflag.BoolP(
+		"dev",
+		"d",
+		false,
+		"enables the dev mode for TLS cert generation,\nwhich allows you to use self-signed certs on localhost",
+	)
 )
 
 func serveDir(app *gramework.App, sp, sr string, slashCnt int) {
@@ -53,6 +60,9 @@ func main() {
 
 	gramework.DisableFlags()
 	app := gramework.New()
+	app.TLSEmails = []string{
+		"3s@gramework.win",
+	}
 
 	app.SPAIndex(*indexPath)
 
@@ -69,5 +79,13 @@ func main() {
 		serveDir(app, sp, sr, slashCnt)
 	}
 
+	if *tls {
+		if *dev {
+			app.ListenAndServeAllDev(*bind)
+			return
+		}
+		app.ListenAndServeAll()
+		return
+	}
 	app.ListenAndServe(*bind)
 }
